@@ -13,14 +13,13 @@ class Loan extends Model
 
     protected $fillable = [
         'name',
-        'tenure',
+        'tenure_options',
         'interest_rate',
         'total_loan_amount',
         'cost_of_living',
         'other_costs',
         'hostel_fees',
         'tuition_fees',
-
         'payable_interest_vaule',
         'monthly_repayment',
         'total_repayment',

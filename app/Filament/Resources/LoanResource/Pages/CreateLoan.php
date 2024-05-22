@@ -11,23 +11,37 @@ class CreateLoan extends CreateRecord
 {
     protected static string $resource = LoanResource::class;
 
-    protected function afterSubmit(): void
+    protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $data = $this->form->getState();
-        $monthlyRate = $data['interest_rate'] / 100 / 12;
-        $monthlyPayment = $data['total_loan_amount'] * $monthlyRate / (1 - pow(1 + $monthlyRate, -$data['tenure_options']));
-        $totalPayment = $monthlyPayment * $data['tenure_options'];
-        $totalInterest = $totalPayment - $data['total_loan_amount'];
+        $interestRate = isset($data['interest_rate']) ? ($data['interest_rate'] / 100) : 0.34; // Convert percentage to decimal
+        $tenure = $data['tenure_options'] ?? 0; // Ensure tenure is set, default to 0
+        //dd($interestRate, $tenure, $data);
+        if ($tenure > 0 && $interestRate > 0) {
+            // Only perform calculations if both interest rate and tenure are provided
+            $monthlyInterestRate = $interestRate / 12;
+            // Monthly Payment calculation
+            $totalInterest = $data['total_loan_amount'] * $monthlyInterestRate * $tenure;
+            $totalRepayment = $data['total_loan_amount'] + $totalInterest;
+            $monthlyRepayment = $totalRepayment / $tenure;
+            //dd($monthlyRepayment, $totalRepayment, $totalInterest);
+            // Add calculated values to the array
+            $data['monthly_repayment'] = $monthlyRepayment;
+            $data['total_repayment'] = $totalRepayment;
+            $data['payable_interest_vaule'] = $totalInterest;
+            $data['interest_rate'] = $interestRate;
+        } else {
+            // Log an error if required data is missing
+            logger()->error('Loan calculation failed due to insufficient data', [
+                'interest_rate' => $data['interest_rate'],
+                'tenure_options' => $data['tenure_options'],
+                'total_loan_amount' => $data['total_loan_amount']
+            ]);
+        }
+        return $data;
+    }
 
-        // Save to the database
-        Loan::create([
-            'name' => $data['name'],
-            'total_loan_amount' => $data['total_loan_amount'],
-            'interest_rate' => $data['interest_rate'],
-            'tenure_options' => $data['tenure_options'],
-            'monthly_payment' => $monthlyPayment,
-            'total_payment' => $totalPayment,
-            'total_interest' => $totalInterest
-        ]);
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
     }
 }
